@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 import os
 import platform
 import subprocess
@@ -60,10 +61,8 @@ def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
         raise ConfigError(f"unable to write manifest: {exc}") from exc
     finally:
         if temp_name is not None:
-            try:
+            with suppress(OSError):
                 Path(temp_name).unlink(missing_ok=True)
-            except OSError:
-                pass
 
 
 def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
