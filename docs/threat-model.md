@@ -4,14 +4,14 @@ EvidenceKit processes files and metadata that may originate from CI jobs or untr
 
 | Threat | v0.1 control |
 |---|---|
-| Path traversal | Reject absolute paths and parent traversal; resolve artifact and output paths inside the workspace |
-| Symlink escape | Reject symlink artifacts, config targets, and manifest outputs |
+| Path traversal | Reject absolute paths and parent traversal; on supported POSIX runners, open each path component through directory descriptors with no-follow semantics |
+| Symlink escape | Reject symlink artifacts, config targets, and manifest outputs; artifact reads use no-follow opens where the platform supports them |
 | Manifest corruption | Deterministic canonical serialization plus a SHA-256 self-digest detects accidental/inconsistent modification when the recorded digest is not recomputed |
 | Manifest authenticity | **Not provided in v0.1.** An attacker able to edit the manifest can recompute its self-digest; use a separately trusted digest/signature when authenticity is required |
-| Artifact drift | Recompute byte size and SHA-256 during verify and compare with the recorded manifest |
+| Artifact drift | Recompute byte size and SHA-256 from the same opened file descriptor during verify and compare with the recorded manifest |
 | Special-file blocking | Hash only regular files; reject FIFOs, devices, directories, and symlinks |
-| Oversized artifacts | Configurable byte limit is enforced before artifact hashing and JUnit XML parsing |
-| XML parser abuse | JUnit XML uses a hardened parser and bounded file size |
+| Oversized artifacts | Configurable byte limit is enforced while reading opened artifact descriptors; a hard upper bound also limits configured artifact size |
+| XML parser abuse | JUnit XML is parsed from already bounded, no-follow-opened bytes with a hardened parser, and only when its digest matches the artifact manifest |
 | Secret leakage | Explicit include patterns, protected metadata directories, suspicious-name warnings, documentation, and review |
 | Untrusted action input | Composite-action config input is passed through environment variables rather than interpolated into shell syntax |
 | Untrusted PR execution | Repository workflows use read-only permissions unless a narrowly scoped read permission is required |
