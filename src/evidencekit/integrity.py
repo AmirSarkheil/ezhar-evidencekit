@@ -48,6 +48,36 @@ def _base_open_flags() -> int:
     return flags
 
 
+def open_directory_no_symlinks(path: Path) -> int:
+    """Open an absolute directory path component-by-component without following symlinks."""
+    try:
+        absolute = path.absolute()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SecurityError(f"unable to normalize directory path: {exc}") from exc
+
+    if not absolute.is_absolute() or not absolute.anchor:
+        raise SecurityError(f"directory path must be absolute: {path}")
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise SecurityError("platform does not support secure directory opens")
+    if os.open not in getattr(os, "supports_dir_fd", set()):
+        raise SecurityError("platform does not support directory-relative opens")
+
+    flags = _base_open_flags() | os.O_DIRECTORY | os.O_NOFOLLOW
+    current_fd: int | None = None
+    try:
+        current_fd = os.open(absolute.anchor, flags)
+        for component in absolute.parts[1:]:
+            next_fd = os.open(component, flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd
+    except (OSError, UnicodeError) as exc:
+        if current_fd is not None:
+            with suppress(OSError):
+                os.close(current_fd)
+        raise SecurityError(f"unable to open directory safely: {absolute}") from exc
+
+
 def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
     rel = _validate_relative_artifact_path(relative_path)
     try:
@@ -64,23 +94,25 @@ def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
         if hasattr(os, "O_NONBLOCK"):
             file_flags |= os.O_NONBLOCK
 
-        directory_fds: list[int] = []
+        current_fd: int | None = None
         try:
-            current_fd = os.open(root_resolved, directory_flags)
-            directory_fds.append(current_fd)
+            current_fd = open_directory_no_symlinks(root_resolved)
             for part in rel.parts[:-1]:
-                current_fd = os.open(part, directory_flags, dir_fd=current_fd)
-                directory_fds.append(current_fd)
+                next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+                os.close(current_fd)
+                current_fd = next_fd
 
             descriptor = os.open(rel.parts[-1], file_flags, dir_fd=current_fd)
         except FileNotFoundError as exc:
             raise SecurityError(f"artifact does not exist: {relative_path}") from exc
+        except SecurityError:
+            raise
         except (OSError, UnicodeError) as exc:
             raise SecurityError(f"unable to open artifact safely: {relative_path}") from exc
         finally:
-            for directory_fd in reversed(directory_fds):
+            if current_fd is not None:
                 with suppress(OSError):
-                    os.close(directory_fd)
+                    os.close(current_fd)
     else:
         candidate = safe_artifact_path(root_resolved, relative_path)
         flags = _base_open_flags()
@@ -210,14 +242,15 @@ def sha256_file(path: Path, chunk_size: int = _READ_CHUNK) -> str:
 
 def safe_artifact_path(root: Path, relative_path: str, *, require_exists: bool = True) -> Path:
     rel = _validate_relative_artifact_path(relative_path)
-    root_resolved = root.resolve()
-    candidate = root_resolved / rel
-
     try:
+        root_resolved = root.resolve()
+        candidate = root_resolved / rel
         if candidate.is_symlink():
             raise SecurityError(f"symlink artifacts are not allowed: {relative_path}")
         resolved = candidate.resolve(strict=False)
-    except (OSError, UnicodeError, ValueError) as exc:
+    except SecurityError:
+        raise
+    except (OSError, UnicodeError, RuntimeError, ValueError) as exc:
         raise SecurityError(f"unable to resolve artifact path: {relative_path}") from exc
 
     try:
