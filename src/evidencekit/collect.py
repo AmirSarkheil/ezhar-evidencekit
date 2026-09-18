@@ -36,17 +36,90 @@ def _git_revision(root: Path) -> str | None:
     return revision or None
 
 
-def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.parent.is_symlink():
-        raise ConfigError(f"manifest parent must not be a symlink: {path.parent}")
+def _manifest_payload(manifest: dict[str, Any]) -> bytes:
+    try:
+        return (
+            json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise ConfigError(f"unable to serialize manifest: {exc}") from exc
 
-    payload = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+
+def _write_manifest_posix(root: Path, relative: Path, payload: bytes) -> None:
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+
+    file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        file_flags |= os.O_CLOEXEC
+
+    directory_fds: list[int] = []
+    temp_name = f".evidencekit-{uuid.uuid4().hex}.tmp"
+    temp_created = False
+    try:
+        current_fd = os.open(root, directory_flags)
+        directory_fds.append(current_fd)
+
+        for part in relative.parts[:-1]:
+            try:
+                next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(part, 0o755, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+                next_fd = os.open(part, directory_flags, dir_fd=current_fd)
+            current_fd = next_fd
+            directory_fds.append(current_fd)
+
+        descriptor = os.open(temp_name, file_flags, 0o644, dir_fd=current_fd)
+        temp_created = True
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError as exc:
+            raise ConfigError(f"unable to write temporary manifest: {exc}") from exc
+
+        try:
+            os.replace(
+                temp_name,
+                relative.parts[-1],
+                src_dir_fd=current_fd,
+                dst_dir_fd=current_fd,
+            )
+        except OSError as exc:
+            raise ConfigError(f"unable to replace manifest atomically: {exc}") from exc
+        temp_created = False
+        with suppress(OSError):
+            os.fsync(current_fd)
+    except ConfigError:
+        raise
+    except OSError as exc:
+        raise ConfigError(f"unable to write manifest safely: {exc}") from exc
+    finally:
+        if directory_fds:
+            current_fd = directory_fds[-1]
+            if temp_created:
+                with suppress(OSError):
+                    os.unlink(temp_name, dir_fd=current_fd)
+        for directory_fd in reversed(directory_fds):
+            with suppress(OSError):
+                os.close(directory_fd)
+
+
+def _write_manifest_fallback(path: Path, payload: bytes) -> None:
     temp_name: str | None = None
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.parent.is_symlink() or path.is_symlink():
+            raise ConfigError(f"manifest output path must not contain a symlink: {path}")
+
+        before = path.parent.stat(follow_symlinks=False)
         with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
+            mode="wb",
             dir=path.parent,
             prefix=".evidencekit-",
             suffix=".tmp",
@@ -56,14 +129,41 @@ def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
+
+        after = path.parent.stat(follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise ConfigError("manifest directory changed during write")
+        if path.parent.is_symlink() or path.is_symlink():
+            raise ConfigError(f"manifest output path became a symlink: {path}")
+
         os.replace(temp_name, path)
         temp_name = None
+    except ConfigError:
+        raise
     except OSError as exc:
         raise ConfigError(f"unable to write manifest: {exc}") from exc
     finally:
         if temp_name is not None:
             with suppress(OSError):
                 Path(temp_name).unlink(missing_ok=True)
+
+
+def _atomic_write_json(root: Path, relative: Path, manifest: dict[str, Any]) -> None:
+    if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+        raise ConfigError("manifest output must be a safe relative path")
+
+    payload = _manifest_payload(manifest)
+    secure_dir_fd = (
+        os.open in getattr(os, "supports_dir_fd", set())
+        and os.mkdir in getattr(os, "supports_dir_fd", set())
+        and os.replace in getattr(os, "supports_dir_fd", set())
+        and hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+    )
+    if secure_dir_fd:
+        _write_manifest_posix(root, relative, payload)
+    else:
+        _write_manifest_fallback(root / relative, payload)
 
 
 def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
@@ -75,14 +175,14 @@ def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
         raise ConfigError(f"workspace is not an existing directory: {root}")
 
     output_path = resolve_manifest_path(config_path, config)
-    output_relative = output_path.relative_to(root).as_posix()
+    output_relative = output_path.relative_to(root)
 
     artifacts, warnings = collect_artifacts(
         root,
         list(config["include"]),
         list(config["exclude"]),
         int(config["max_artifact_bytes"]),
-        excluded_paths={output_relative},
+        excluded_paths={output_relative.as_posix()},
     )
     artifact_digests = {item.path: item.sha256 for item in artifacts}
     junit_paths = [Path(item).as_posix() for item in config["junit"]]
@@ -114,7 +214,5 @@ def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
     }
     manifest["manifest_sha256"] = manifest_digest(manifest)
 
-    if output_path.is_symlink():
-        raise ConfigError(f"manifest output must not be a symlink: {output_path}")
-    _atomic_write_json(output_path, manifest)
+    _atomic_write_json(root, output_relative, manifest)
     return manifest, output_path
