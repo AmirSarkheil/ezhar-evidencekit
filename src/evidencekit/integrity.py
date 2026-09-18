@@ -115,6 +115,12 @@ def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
                     os.close(current_fd)
     else:
         candidate = safe_artifact_path(root_resolved, relative_path)
+        try:
+            if not candidate.is_file():
+                raise SecurityError(f"non-regular artifact: {relative_path}")
+        except OSError as exc:
+            raise SecurityError(f"unable to inspect artifact: {relative_path}") from exc
+
         flags = _base_open_flags()
         if hasattr(os, "O_NONBLOCK"):
             flags |= os.O_NONBLOCK
