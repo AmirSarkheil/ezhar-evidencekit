@@ -4,7 +4,7 @@ import fnmatch
 from pathlib import Path
 
 from evidencekit.errors import SecurityError
-from evidencekit.integrity import looks_sensitive, media_type_for, safe_artifact_path, sha256_file
+from evidencekit.integrity import hash_artifact, looks_sensitive, media_type_for
 from evidencekit.models import ArtifactRecord
 
 
@@ -50,37 +50,37 @@ def collect_artifacts(
                 continue
             if _matches_any(relative, excludes):
                 continue
-            if candidate.is_symlink():
-                warnings.append(f"symlink artifacts are not allowed: {relative}")
-                continue
-            if candidate.is_dir():
+
+            # Directory/symlink probes are only a convenience to keep broad globs quiet.
+            # The actual read below re-opens the path safely and independently.
+            try:
+                if candidate.is_symlink():
+                    warnings.append(f"symlink artifacts are not allowed: {relative}")
+                    continue
+                if candidate.is_dir():
+                    continue
+            except OSError as exc:
+                warnings.append(f"unable to inspect artifact {relative}: {exc}")
                 continue
 
             try:
-                safe = safe_artifact_path(root, relative)
-                if not safe.is_file():
-                    warnings.append(f"skipped non-regular artifact: {relative}")
-                    continue
-                size = safe.stat().st_size
-                if size > max_artifact_bytes:
-                    warnings.append(
-                        f"skipped oversized artifact {relative} "
-                        f"({size} > {max_artifact_bytes} bytes)"
-                    )
-                    continue
-                digest = sha256_file(safe)
+                display_path, size, digest = hash_artifact(
+                    root,
+                    relative,
+                    max_bytes=max_artifact_bytes,
+                )
             except (OSError, SecurityError) as exc:
                 warnings.append(str(exc))
                 continue
 
-            if looks_sensitive(safe):
+            if looks_sensitive(display_path):
                 warnings.append(f"artifact name may contain sensitive material: {relative}")
 
             found[relative] = ArtifactRecord(
                 path=relative,
                 sha256=digest,
                 size=size,
-                media_type=media_type_for(safe),
+                media_type=media_type_for(display_path),
             )
 
     return [found[key] for key in sorted(found)], warnings
