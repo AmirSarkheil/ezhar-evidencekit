@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import stat
 import tempfile
+import uuid
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,7 @@ from evidencekit.errors import ConfigError
 
 
 HARD_MAX_ARTIFACT_BYTES = 268_435_456
+MAX_CONFIG_BYTES = 1_048_576
 
 DEFAULT_CONFIG = {
     "schema_version": "1.0",
@@ -27,9 +30,31 @@ _PROTECTED_OUTPUT_PARTS = {".git", ".evidencekit"}
 _CONTROL_CHARS = {"\x00", "\r", "\n"}
 
 
+def _ensure_config_location(config_path: Path) -> Path:
+    absolute = config_path.absolute()
+    parent = absolute.parent
+    base = parent.parent if parent.name == ".evidencekit" else parent
+
+    try:
+        if parent.is_symlink() or base.is_symlink():
+            raise ConfigError("configuration parent directories must not be symlinks")
+        parent.resolve(strict=False)
+        base.resolve(strict=False)
+    except ConfigError:
+        raise
+    except (OSError, RuntimeError) as exc:
+        raise ConfigError(f"unable to resolve configuration location: {exc}") from exc
+    return absolute
+
+
 def _config_base_dir(config_path: Path) -> Path:
-    parent = config_path.parent.resolve()
-    return parent.parent if parent.name == ".evidencekit" else parent
+    absolute = _ensure_config_location(config_path)
+    parent = absolute.parent
+    base = parent.parent if parent.name == ".evidencekit" else parent
+    try:
+        return base.resolve(strict=False)
+    except (OSError, RuntimeError) as exc:
+        raise ConfigError(f"unable to resolve configuration base: {exc}") from exc
 
 
 def _validate_relative_path(
@@ -44,7 +69,11 @@ def _validate_relative_path(
     if any(char in value for char in _CONTROL_CHARS):
         raise ConfigError(f"{field} contains unsupported control characters")
 
-    path = Path(value)
+    try:
+        path = Path(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{field} is not a valid path") from exc
+
     if path.is_absolute() or ".." in path.parts:
         raise ConfigError(f"{field} must be relative and must not contain '..'")
     if not path.parts and not allow_dot:
@@ -64,7 +93,10 @@ def _validate_glob_patterns(value: Any, field: str) -> list[str]:
     for pattern in value:
         if not pattern.strip():
             raise ConfigError(f"{field} contains an empty glob")
-        path = Path(pattern)
+        try:
+            path = Path(pattern)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(f"invalid {field} glob: {pattern!r}") from exc
         if path.is_absolute() or ".." in path.parts:
             raise ConfigError(f"{field} globs must be relative and must not contain '..'")
         if any("**" in part and part != "**" for part in path.parts):
@@ -73,46 +105,154 @@ def _validate_glob_patterns(value: Any, field: str) -> list[str]:
     return result
 
 
-def _write_config_posix(target_dir: Path, payload: bytes, *, force: bool) -> None:
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+def _open_flags(read_only: bool = True) -> int:
+    flags = os.O_RDONLY if read_only else os.O_WRONLY
     if hasattr(os, "O_CLOEXEC"):
-        directory_flags |= os.O_CLOEXEC
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NONBLOCK"):
+        flags |= os.O_NONBLOCK
+    return flags
 
+
+def _read_config_text(path: Path) -> str:
+    path = _ensure_config_location(path)
+    flags = _open_flags()
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ConfigError(f"unable to open configuration safely: {exc}") from exc
+
+    try:
+        with os.fdopen(descriptor, "rb") as handle:
+            metadata = os.fstat(handle.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ConfigError("configuration must be a regular file")
+            payload = handle.read(MAX_CONFIG_BYTES + 1)
+            if len(payload) > MAX_CONFIG_BYTES:
+                raise ConfigError(
+                    f"configuration exceeds maximum size of {MAX_CONFIG_BYTES} bytes"
+                )
+    except ConfigError:
+        raise
+    except OSError as exc:
+        raise ConfigError(f"unable to read configuration: {exc}") from exc
+
+    try:
+        return payload.decode("utf-8")
+    except UnicodeError as exc:
+        raise ConfigError(f"configuration is not valid UTF-8: {exc}") from exc
+
+
+def _inspect_existing_config(directory_fd: int) -> None:
+    flags = _open_flags()
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    try:
+        descriptor = os.open("config.yml", flags, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise ConfigError(f"unable to inspect existing configuration safely: {exc}") from exc
+
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ConfigError("existing configuration must be a regular file")
+        if metadata.st_nlink != 1:
+            raise ConfigError("refusing to replace a hard-linked configuration file")
+    finally:
+        os.close(descriptor)
+
+
+def _write_config_posix(target_dir: Path, payload: bytes, *, force: bool) -> None:
+    directory_flags = _open_flags() | os.O_DIRECTORY | os.O_NOFOLLOW
     try:
         directory_fd = os.open(target_dir, directory_flags)
     except OSError as exc:
         raise ConfigError(f"unable to open configuration directory safely: {exc}") from exc
 
-    file_flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW
-    if hasattr(os, "O_CLOEXEC"):
-        file_flags |= os.O_CLOEXEC
-    file_flags |= os.O_TRUNC if force else os.O_EXCL
-
+    temp_name = f".config-{uuid.uuid4().hex}.tmp"
+    temp_created = False
     try:
+        temp_flags = _open_flags(read_only=False) | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         try:
-            descriptor = os.open("config.yml", file_flags, 0o644, dir_fd=directory_fd)
-        except FileExistsError as exc:
-            raise ConfigError(
-                f"configuration already exists: {target_dir / 'config.yml'}"
-            ) from exc
+            descriptor = os.open(temp_name, temp_flags, 0o644, dir_fd=directory_fd)
+            temp_created = True
         except OSError as exc:
-            raise ConfigError(f"unable to create configuration safely: {exc}") from exc
+            raise ConfigError(f"unable to create temporary configuration: {exc}") from exc
 
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError as exc:
+            raise ConfigError(f"unable to write temporary configuration: {exc}") from exc
+
+        if force:
+            _inspect_existing_config(directory_fd)
+            try:
+                os.replace(
+                    temp_name,
+                    "config.yml",
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                )
+            except OSError as exc:
+                raise ConfigError(f"unable to replace configuration atomically: {exc}") from exc
+            temp_created = False
+        else:
+            try:
+                os.link(
+                    temp_name,
+                    "config.yml",
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            except FileExistsError as exc:
+                raise ConfigError(
+                    f"configuration already exists: {target_dir / 'config.yml'}"
+                ) from exc
+            except OSError as exc:
+                raise ConfigError(f"unable to install configuration atomically: {exc}") from exc
+            try:
+                os.unlink(temp_name, dir_fd=directory_fd)
+            except OSError as exc:
+                raise ConfigError(f"unable to remove temporary configuration: {exc}") from exc
+            temp_created = False
+
+        with suppress(OSError):
+            os.fsync(directory_fd)
     finally:
+        if temp_created:
+            with suppress(OSError):
+                os.unlink(temp_name, dir_fd=directory_fd)
         os.close(directory_fd)
 
 
 def _write_config_fallback(target_dir: Path, target: Path, payload: bytes, *, force: bool) -> None:
-    if target.is_symlink():
-        raise ConfigError(f"configuration path must not be a symlink: {target}")
-    if target.exists() and not force:
-        raise ConfigError(f"configuration already exists: {target}")
+    try:
+        if target.is_symlink():
+            raise ConfigError(f"configuration path must not be a symlink: {target}")
+        if target.exists():
+            metadata = target.stat(follow_symlinks=False)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ConfigError("existing configuration must be a regular file")
+            if metadata.st_nlink != 1:
+                raise ConfigError("refusing to replace a hard-linked configuration file")
+            if not force:
+                raise ConfigError(f"configuration already exists: {target}")
+        before = target_dir.stat(follow_symlinks=False)
+    except ConfigError:
+        raise
+    except OSError as exc:
+        raise ConfigError(f"unable to inspect configuration path: {exc}") from exc
 
-    before = target_dir.stat(follow_symlinks=False)
     temp_name: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -132,8 +272,22 @@ def _write_config_fallback(target_dir: Path, target: Path, payload: bytes, *, fo
             raise ConfigError("configuration directory changed during initialization")
         if target.is_symlink():
             raise ConfigError(f"configuration path became a symlink: {target}")
-        os.replace(temp_name, target)
+
+        if force:
+            if target.exists():
+                metadata = target.stat(follow_symlinks=False)
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    raise ConfigError("refusing to replace unsafe configuration target")
+            os.replace(temp_name, target)
+        else:
+            try:
+                os.link(temp_name, target, follow_symlinks=False)
+            except FileExistsError as exc:
+                raise ConfigError(f"configuration already exists: {target}") from exc
+            os.unlink(temp_name)
         temp_name = None
+    except ConfigError:
+        raise
     except OSError as exc:
         raise ConfigError(f"unable to write configuration: {exc}") from exc
     finally:
@@ -143,26 +297,31 @@ def _write_config_fallback(target_dir: Path, target: Path, payload: bytes, *, fo
 
 
 def write_default_config(repo_root: Path, *, force: bool = False) -> Path:
-    repo_root = repo_root.resolve()
+    try:
+        repo_root = repo_root.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise ConfigError(f"unable to resolve repository root: {exc}") from exc
+
     target_dir = repo_root / ".evidencekit"
     target = target_dir / "config.yml"
 
     try:
         if target_dir.is_symlink() or target.is_symlink():
             raise ConfigError(f"configuration path must not be a symlink: {target}")
-        resolved_target = target.resolve(strict=False)
-        resolved_target.relative_to(repo_root)
+        target.resolve(strict=False).relative_to(repo_root)
         target_dir.mkdir(parents=True, exist_ok=True)
         if target_dir.is_symlink() or target_dir.resolve() != target_dir:
             raise ConfigError(f"configuration directory changed unexpectedly: {target_dir}")
     except ConfigError:
         raise
-    except (OSError, ValueError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise ConfigError(f"unable to prepare configuration path: {exc}") from exc
 
     payload = yaml.safe_dump(DEFAULT_CONFIG, sort_keys=False).encode("utf-8")
     secure_dir_fd = (
         os.open in getattr(os, "supports_dir_fd", set())
+        and os.link in getattr(os, "supports_dir_fd", set())
+        and os.replace in getattr(os, "supports_dir_fd", set())
         and hasattr(os, "O_DIRECTORY")
         and hasattr(os, "O_NOFOLLOW")
     )
@@ -174,15 +333,11 @@ def write_default_config(repo_root: Path, *, force: bool = False) -> Path:
 
 
 def load_config(path: Path) -> dict[str, Any]:
-    if path.is_symlink():
-        raise ConfigError(f"configuration must not be a symlink: {path}")
-    if not path.exists():
-        raise ConfigError(f"configuration not found: {path}")
-
+    text = _read_config_text(path)
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, yaml.YAMLError) as exc:
-        raise ConfigError(f"invalid configuration: {exc}") from exc
+        raw = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"invalid configuration YAML: {exc}") from exc
 
     if raw is None:
         raw = {}
@@ -221,11 +376,17 @@ def load_config(path: Path) -> dict[str, Any]:
 def resolve_workspace(config_path: Path, config: dict[str, Any]) -> Path:
     base = _config_base_dir(config_path)
     workspace = Path(str(config["workspace"]))
-    candidate = (base / workspace).resolve(strict=False)
+    if any(part.lower() in _PROTECTED_OUTPUT_PARTS for part in workspace.parts):
+        raise ConfigError("workspace must not be inside protected repository metadata")
+
     try:
-        candidate.relative_to(base)
-    except ValueError as exc:
-        raise ConfigError("workspace must remain inside the configuration repository") from exc
+        candidate = (base / workspace).resolve(strict=False)
+        relative = candidate.relative_to(base)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ConfigError(f"unable to resolve workspace safely: {exc}") from exc
+
+    if any(part.lower() in _PROTECTED_OUTPUT_PARTS for part in relative.parts):
+        raise ConfigError("workspace must not be inside protected repository metadata")
     return candidate
 
 
@@ -234,14 +395,15 @@ def resolve_manifest_path(config_path: Path, config: dict[str, Any]) -> Path:
     relative = Path(str(config["manifest"]))
     candidate = root / relative
 
-    if candidate.is_symlink():
-        raise ConfigError(f"manifest output must not be a symlink: {candidate}")
-
-    resolved = candidate.resolve(strict=False)
     try:
+        if candidate.is_symlink():
+            raise ConfigError(f"manifest output must not be a symlink: {candidate}")
+        resolved = candidate.resolve(strict=False)
         rel = resolved.relative_to(root)
-    except ValueError as exc:
-        raise ConfigError("manifest output must remain inside the workspace") from exc
+    except ConfigError:
+        raise
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ConfigError(f"unable to resolve manifest output safely: {exc}") from exc
 
     if any(part.lower() in _PROTECTED_OUTPUT_PARTS for part in rel.parts):
         raise ConfigError("manifest output must not be inside protected repository metadata")
