@@ -3,13 +3,15 @@ from __future__ import annotations
 import json
 import os
 import stat
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, NoReturn
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from evidencekit.canonical import manifest_digest
-from evidencekit.errors import ValidationFailure
+from evidencekit.errors import SecurityError, ValidationFailure
+from evidencekit.integrity import open_directory_no_symlinks
 from evidencekit.schema import EVIDENCE_MANIFEST_V1
 
 
@@ -67,10 +69,23 @@ def _read_manifest_text(path: Path) -> str:
     if hasattr(os, "O_NONBLOCK"):
         flags |= os.O_NONBLOCK
 
+    parent_fd: int | None = None
     try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
+        if (
+            os.open in getattr(os, "supports_dir_fd", set())
+            and hasattr(os, "O_DIRECTORY")
+            and hasattr(os, "O_NOFOLLOW")
+        ):
+            parent_fd = open_directory_no_symlinks(path.parent)
+            descriptor = os.open(path.name, flags, dir_fd=parent_fd)
+        else:
+            descriptor = os.open(path, flags)
+    except (OSError, SecurityError, UnicodeError) as exc:
         raise ValidationFailure(f"unable to open manifest: {exc}") from exc
+    finally:
+        if parent_fd is not None:
+            with suppress(OSError):
+                os.close(parent_fd)
 
     try:
         with os.fdopen(descriptor, "rb") as handle:
