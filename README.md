@@ -4,8 +4,9 @@
 [![Security](https://github.com/AmirSarkheil/ezhar-evidencekit/actions/workflows/security.yml/badge.svg)](https://github.com/AmirSarkheil/ezhar-evidencekit/actions/workflows/security.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](pyproject.toml)
+[![Release](https://img.shields.io/github/v/release/AmirSarkheil/ezhar-evidencekit?display_name=tag&sort=semver)](https://github.com/AmirSarkheil/ezhar-evidencekit/releases/tag/v0.1.0)
 
-> **Version:** v0.1.0 — first public release baseline.
+> **Current release:** [v0.1.0](https://github.com/AmirSarkheil/ezhar-evidencekit/releases/tag/v0.1.0).
 
 EZHAR EvidenceKit is a vendor-neutral open-source toolkit for creating, validating, verifying, and reporting reproducible evidence packages from software and AI engineering workflows.
 
