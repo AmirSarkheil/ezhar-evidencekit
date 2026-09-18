@@ -1,20 +1,20 @@
-# EZHAR EvidenceKit v0.1.0 — Candidate Release Notes
+# EZHAR EvidenceKit v0.1.0
 
-> **Pre-public candidate.** These notes describe the reviewed private candidate and are not a public release announcement.
+Released: **2026-09-18**
 
-## What v0.1.0 provides
+EZHAR EvidenceKit v0.1.0 is the first public baseline of a vendor-neutral toolkit for producing reproducible engineering evidence packages.
 
-EvidenceKit v0.1.0 introduces a compact, vendor-neutral evidence loop for software and AI engineering workflows:
+## Core workflow
 
 ```text
 collect -> validate -> verify -> report
 ```
 
-The candidate can collect configured artifacts, record their byte sizes and SHA-256 digests, ingest bounded JUnit XML results, validate a versioned Evidence Manifest v1, detect later artifact or manifest changes, and render machine-readable JSON or a human-readable Markdown report.
+EvidenceKit can collect configured artifacts, record byte sizes and SHA-256 digests, ingest bounded JUnit XML results, validate Evidence Manifest v1, detect later artifact or manifest changes, and render machine-readable JSON or a human-readable Markdown report.
 
 ## CLI
 
-The candidate includes:
+v0.1.0 includes:
 
 - `evidencekit init`
 - `evidencekit collect`
@@ -24,44 +24,77 @@ The candidate includes:
 
 ## Evidence Manifest v1
 
-The manifest records the schema version, run identity and timestamp, source revision when available, runtime environment, checks, artifact paths and integrity metadata, warnings, and a deterministic manifest self-digest.
+The manifest records:
 
-The self-digest detects inconsistent modification when the recorded digest is not recomputed. It is **not** a digital signature and does not establish author authenticity.
+- schema version;
+- run identity and UTC timestamp;
+- source revision when available;
+- runtime environment;
+- checks and evidence references;
+- artifact paths, sizes, media types, and SHA-256 digests;
+- warnings;
+- a deterministic manifest self-digest.
+
+The self-digest is a consistency mechanism. It is **not** a digital signature and does not establish author authenticity.
 
 ## GitHub Actions integration
 
-The bundled composite action can use the default configuration path or a custom EvidenceKit configuration and manifest location. It validates and verifies the generated manifest, renders a Markdown report, and uploads normalized manifest/report copies as a workflow artifact. The artifact name is configurable for workflows that invoke EvidenceKit more than once.
+The bundled composite action supports:
 
-GitHub Actions dependencies in the repository are pinned to immutable commit SHAs.
+- the default `.evidencekit/config.yml` path;
+- custom EvidenceKit configuration and manifest locations;
+- configurable workflow artifact names;
+- validation and verification before artifact upload;
+- normalized manifest and Markdown report outputs.
 
-## Verified candidate gates
+Repository GitHub Actions dependencies are pinned to immutable commit SHAs.
 
-The private candidate has demonstrated:
+## Verified release baseline
+
+Before publication, the reviewed baseline demonstrated:
 
 - Python 3.11, 3.12, and 3.13 CI;
 - Ruff and strict mypy checks;
-- 68 passing tests with an enforced 80% coverage floor;
+- 68 passing tests with 80.09% measured package coverage;
 - source distribution and wheel builds;
 - clean wheel installation and CLI startup;
 - clean-environment quickstart reproduction;
-- Linux self-dogfooding of collect -> validate -> verify -> report;
+- Linux self-dogfooding of `collect -> validate -> verify -> report`;
 - Windows and macOS smoke testing;
 - default and custom-manifest composite-action smoke tests;
 - dependency auditing and secret scanning;
-- schema parity between the runtime contract and checked-in JSON Schema.
+- parity between the runtime schema and checked-in JSON Schema.
 
 ## Security-focused behavior
 
-The v0.1.0 candidate includes controls and regression tests for path traversal, symlink escape, protected repository metadata, non-regular files, bounded configuration/manifest/artifact inputs, malformed XML, JUnit parser resource limits, Markdown report injection, and atomic output handling where supported.
+v0.1.0 includes controls and regression tests for:
+
+- path traversal;
+- symlink escape;
+- protected repository metadata;
+- non-regular files;
+- bounded configuration, manifest, artifact, and JUnit inputs;
+- malformed XML;
+- JUnit parser element/depth limits;
+- Markdown report injection;
+- atomic output handling where supported.
 
 See `SECURITY.md` and `docs/threat-model.md` for the precise trust boundary and limitations.
 
+## Release artifacts
+
+The GitHub Release automation publishes:
+
+- the Python wheel;
+- the source distribution;
+- `SHA256SUMS.txt`;
+- `release-evidence.json`;
+- `release-evidence-report.md`.
+
+The release evidence package is produced by EvidenceKit itself against the built distribution files.
+
 ## Scope and non-goals
 
-EvidenceKit does not provide certification, compliance attestation, formal verification, SBOM replacement, complete secret detection, or proof of real-world outcomes. It records reproducible engineering evidence and integrity metadata.
+EvidenceKit does not provide certification, compliance attestation, formal verification, SBOM replacement, complete secret detection, or proof of real-world outcomes.
 
 The open-source repository is intentionally separated from private EZHAR DYNAMICS product implementation and proprietary policy/scoring logic. See `docs/ip-boundary.md`.
-
-## Publication status
-
-No public publication is implied by this document. Repository visibility, release tagging, and distribution publication remain separate maintainer-controlled actions.

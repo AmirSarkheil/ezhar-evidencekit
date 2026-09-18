@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Until the first public release, only the current development branch is supported. After release, the latest minor line will receive security fixes unless release notes state otherwise.
+The current v0.1.x line is supported for security fixes. When a newer supported line is released, this policy will be updated explicitly.
 
 ## Reporting a vulnerability
 
