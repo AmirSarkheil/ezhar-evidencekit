@@ -61,3 +61,30 @@ def test_manifest_parent_symlink_escape_is_rejected(tmp_path: Path) -> None:
     config = load_config(path)
     with pytest.raises(ConfigError):
         resolve_manifest_path(path, config)
+
+
+def test_manifest_cannot_target_evidencekit_metadata(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, 'manifest: ".evidencekit/config.json"\n')
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_junit_dot_path_is_rejected(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, 'junit: ["."]\n')
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_non_utf8_config_becomes_config_error(tmp_path: Path) -> None:
+    config_dir = tmp_path / ".evidencekit"
+    config_dir.mkdir()
+    path = config_dir / "config.yml"
+    path.write_bytes(b"\xff\xfe\x00")
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_excessive_artifact_limit_is_rejected(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, "max_artifact_bytes: 999999999\n")
+    with pytest.raises(ConfigError):
+        load_config(path)
