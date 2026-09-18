@@ -67,7 +67,7 @@ def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
 
 
 def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
-    config_path = config_path.resolve()
+    config_path = config_path.absolute()
     config = load_config(config_path)
     root = resolve_workspace(config_path, config)
     if not root.exists() or not root.is_dir():
