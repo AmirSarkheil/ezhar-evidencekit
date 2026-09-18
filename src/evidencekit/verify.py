@@ -66,7 +66,7 @@ def verify_manifest(
                 relative,
                 max_bytes=max_bytes,
             )
-        except (OSError, SecurityError) as exc:
+        except (OSError, SecurityError, UnicodeError) as exc:
             problems.append(str(exc))
             continue
 
