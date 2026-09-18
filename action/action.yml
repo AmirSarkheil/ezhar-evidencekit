@@ -1,0 +1,33 @@
+name: "EZHAR EvidenceKit"
+description: "Collect, validate, verify, and upload a reproducible EvidenceKit package"
+inputs:
+  config:
+    description: "Path to EvidenceKit config"
+    required: false
+    default: ".evidencekit/config.yml"
+  python-version:
+    description: "Python version used to run EvidenceKit"
+    required: false
+    default: "3.12"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - shell: bash
+      run: python -m pip install "${{ github.action_path }}/.."
+    - shell: bash
+      run: evidencekit collect --config "${{ inputs.config }}"
+    - shell: bash
+      run: evidencekit validate evidence.json
+    - shell: bash
+      run: evidencekit verify evidence.json
+    - shell: bash
+      run: evidencekit report evidence.json --format markdown --output evidence-report.md
+    - uses: actions/upload-artifact@v4
+      with:
+        name: evidencekit-package
+        path: |
+          evidence.json
+          evidence-report.md
