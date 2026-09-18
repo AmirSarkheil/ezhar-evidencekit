@@ -9,7 +9,8 @@ _MARKDOWN_SPECIAL = "\\*_{}[]()#+!|" + chr(96)
 
 
 def _markdown_text(value: Any) -> str:
-    text = html.escape(str(value), quote=False)
+    safe_text = str(value).encode("utf-8", errors="backslashreplace").decode("utf-8")
+    text = html.escape(safe_text, quote=False)
     text = text.replace("\r", " ").replace("\n", " ")
     for char in _MARKDOWN_SPECIAL:
         text = text.replace(char, f"\\{char}")
