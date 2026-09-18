@@ -30,22 +30,31 @@ runs:
         set -euo pipefail
         evidencekit collect --config "$CONFIG"
 
-        mapfile -t EVIDENCEKIT_PATHS < <(
+        MANIFEST="$(
           python - "$CONFIG" <<'PY'
         from pathlib import Path
         import sys
 
-        from evidencekit.config import load_config, resolve_manifest_path, resolve_workspace
+        from evidencekit.config import load_config, resolve_manifest_path
 
         config_path = Path(sys.argv[1]).absolute()
         config = load_config(config_path)
         print(resolve_manifest_path(config_path, config))
+        PY
+        )"
+
+        WORKSPACE="$(
+          python - "$CONFIG" <<'PY'
+        from pathlib import Path
+        import sys
+
+        from evidencekit.config import load_config, resolve_workspace
+
+        config_path = Path(sys.argv[1]).absolute()
+        config = load_config(config_path)
         print(resolve_workspace(config_path, config))
         PY
-        )
-
-        MANIFEST="${EVIDENCEKIT_PATHS[0]}"
-        WORKSPACE="${EVIDENCEKIT_PATHS[1]}"
+        )"
 
         evidencekit validate "$MANIFEST"
         evidencekit verify "$MANIFEST" --workspace "$WORKSPACE"
