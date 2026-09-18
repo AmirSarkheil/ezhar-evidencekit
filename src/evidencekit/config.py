@@ -36,6 +36,8 @@ def _ensure_config_location(config_path: Path) -> Path:
     base = parent.parent if parent.name == ".evidencekit" else parent
 
     try:
+        if absolute.is_symlink():
+            raise ConfigError("configuration file must not be a symlink")
         if parent.is_symlink() or base.is_symlink():
             raise ConfigError("configuration parent directories must not be symlinks")
         parent.resolve(strict=False)
