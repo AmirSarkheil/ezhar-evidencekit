@@ -1,0 +1,10 @@
+schema_version: "1.0"
+workspace: "."
+manifest: "evidence.json"
+include:
+  - "artifacts/**/*"
+exclude:
+  - "**/.git/**"
+  - "**/.evidencekit/**"
+max_artifact_bytes: 10485760
+junit: []
