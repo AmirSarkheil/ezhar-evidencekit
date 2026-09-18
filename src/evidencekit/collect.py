@@ -15,7 +15,8 @@ from typing import Any
 from evidencekit.canonical import manifest_digest
 from evidencekit.collectors import collect_artifacts, collect_junit_checks
 from evidencekit.config import load_config, resolve_manifest_path, resolve_workspace
-from evidencekit.errors import ConfigError
+from evidencekit.errors import ConfigError, SecurityError
+from evidencekit.integrity import open_directory_no_symlinks
 
 
 def _git_revision(root: Path) -> str | None:
@@ -58,7 +59,7 @@ def _write_manifest_posix(root: Path, relative: Path, payload: bytes) -> None:
     temp_name = f".evidencekit-{uuid.uuid4().hex}.tmp"
     temp_created = False
     try:
-        current_fd = os.open(root, directory_flags)
+        current_fd = open_directory_no_symlinks(root)
         directory_fds.append(current_fd)
 
         for part in relative.parts[:-1]:
@@ -95,6 +96,8 @@ def _write_manifest_posix(root: Path, relative: Path, payload: bytes) -> None:
             os.fsync(current_fd)
     except ConfigError:
         raise
+    except SecurityError as exc:
+        raise ConfigError(f"unable to open manifest workspace safely: {exc}") from exc
     except OSError as exc:
         raise ConfigError(f"unable to write manifest safely: {exc}") from exc
     finally:
