@@ -36,3 +36,34 @@ jobs:
             evidence.json
             evidence-report.md
             artifacts/pytest.xml
+
+  composite-action-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Prepare custom-manifest configuration
+        run: |
+          mkdir -p artifacts .evidencekit
+          printf 'action smoke evidence\n' > artifacts/action-smoke.txt
+          cat > .evidencekit/action-test.yml <<'YAML'
+          schema_version: "1.0"
+          workspace: "."
+          manifest: "reports/evidence.json"
+          include:
+            - "artifacts/**/*"
+          exclude:
+            - "**/.git/**"
+            - "**/.evidencekit/**"
+          max_artifact_bytes: 10485760
+          junit: []
+          YAML
+      - name: Run local EvidenceKit action
+        uses: ./action
+        with:
+          config: .evidencekit/action-test.yml
+          python-version: "3.12"
+      - name: Assert normalized action outputs
+        run: |
+          test -f reports/evidence.json
+          test -f .evidencekit/action-output/evidence.json
+          test -f .evidencekit/action-output/evidence-report.md
