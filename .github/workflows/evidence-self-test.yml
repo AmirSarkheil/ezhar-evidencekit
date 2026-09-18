@@ -2,7 +2,7 @@ name: Evidence Self Test
 
 on:
   push:
-    branches: ["main", "build/**"]
+    branches: ["main", "build/**", "release/**"]
   pull_request:
 
 permissions:
@@ -37,14 +37,33 @@ jobs:
             evidence-report.md
             artifacts/pytest.xml
 
-  composite-action-smoke:
+  composite-action-default-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Prepare default configuration
+        run: |
+          mkdir -p artifacts .evidencekit
+          printf 'default action smoke evidence\n' > artifacts/action-default.txt
+          cp examples/minimal/.evidencekit/config.yml .evidencekit/config.yml
+      - name: Run local EvidenceKit action with defaults
+        uses: ./action
+        with:
+          artifact-name: evidencekit-package-default
+      - name: Assert default action outputs
+        run: |
+          test -f evidence.json
+          test -f .evidencekit/action-output/evidence.json
+          test -f .evidencekit/action-output/evidence-report.md
+
+  composite-action-custom-smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Prepare custom-manifest configuration
         run: |
           mkdir -p artifacts .evidencekit
-          printf 'action smoke evidence\n' > artifacts/action-smoke.txt
+          printf 'custom action smoke evidence\n' > artifacts/action-smoke.txt
           cat > .evidencekit/action-test.yml <<'YAML'
           schema_version: "1.0"
           workspace: "."
@@ -57,11 +76,12 @@ jobs:
           max_artifact_bytes: 10485760
           junit: []
           YAML
-      - name: Run local EvidenceKit action
+      - name: Run local EvidenceKit action with custom manifest
         uses: ./action
         with:
           config: .evidencekit/action-test.yml
           python-version: "3.12"
+          artifact-name: evidencekit-package-custom
       - name: Assert normalized action outputs
         run: |
           test -f reports/evidence.json
