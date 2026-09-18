@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -137,10 +138,8 @@ def _write_config_fallback(target_dir: Path, target: Path, payload: bytes, *, fo
         raise ConfigError(f"unable to write configuration: {exc}") from exc
     finally:
         if temp_name is not None:
-            try:
+            with suppress(OSError):
                 Path(temp_name).unlink(missing_ok=True)
-            except OSError:
-                pass
 
 
 def write_default_config(repo_root: Path, *, force: bool = False) -> Path:
