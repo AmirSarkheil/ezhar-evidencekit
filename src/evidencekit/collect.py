@@ -65,10 +65,8 @@ def _write_manifest_posix(root: Path, relative: Path, payload: bytes) -> None:
             try:
                 next_fd = os.open(part, directory_flags, dir_fd=current_fd)
             except FileNotFoundError:
-                try:
+                with suppress(FileExistsError):
                     os.mkdir(part, 0o755, dir_fd=current_fd)
-                except FileExistsError:
-                    pass
                 next_fd = os.open(part, directory_flags, dir_fd=current_fd)
             current_fd = next_fd
             directory_fds.append(current_fd)
