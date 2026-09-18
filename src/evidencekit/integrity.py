@@ -50,10 +50,10 @@ def _base_open_flags() -> int:
 
 def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
     rel = _validate_relative_artifact_path(relative_path)
-    root_resolved = root.resolve()
-
-    if not root_resolved.exists() or not root_resolved.is_dir():
-        raise SecurityError(f"workspace is not an existing directory: {root_resolved}")
+    try:
+        root_resolved = root.absolute()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SecurityError(f"unable to resolve workspace path: {exc}") from exc
 
     supports_dir_fd = os.open in getattr(os, "supports_dir_fd", set())
     supports_nofollow = hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY")
@@ -75,7 +75,7 @@ def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
             descriptor = os.open(rel.parts[-1], file_flags, dir_fd=current_fd)
         except FileNotFoundError as exc:
             raise SecurityError(f"artifact does not exist: {relative_path}") from exc
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             raise SecurityError(f"unable to open artifact safely: {relative_path}") from exc
         finally:
             for directory_fd in reversed(directory_fds):
@@ -90,7 +90,7 @@ def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
             descriptor = os.open(candidate, flags)
         except FileNotFoundError as exc:
             raise SecurityError(f"artifact does not exist: {relative_path}") from exc
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             raise SecurityError(f"unable to open artifact: {relative_path}") from exc
 
     try:
@@ -190,7 +190,7 @@ def sha256_file(path: Path, chunk_size: int = _READ_CHUNK) -> str:
 
     try:
         descriptor = os.open(path, flags)
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise SecurityError(f"unable to open artifact: {path}") from exc
 
     digest = hashlib.sha256()
