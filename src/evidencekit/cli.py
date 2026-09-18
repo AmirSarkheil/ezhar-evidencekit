@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(rendered, end="")
             return 0
 
-    except (EvidenceKitError, OSError) as exc:
+    except (EvidenceKitError, OSError, UnicodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     return 1
