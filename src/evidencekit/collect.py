@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-from contextlib import suppress
 import os
 import platform
 import subprocess
 import sys
 import tempfile
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -41,7 +41,7 @@ def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
     if path.parent.is_symlink():
         raise ConfigError(f"manifest parent must not be a symlink: {path.parent}")
 
-    payload = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    payload = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
     temp_name: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -57,6 +57,7 @@ def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temp_name, path)
+        temp_name = None
     except OSError as exc:
         raise ConfigError(f"unable to write manifest: {exc}") from exc
     finally:
@@ -66,6 +67,7 @@ def _atomic_write_json(path: Path, manifest: dict[str, Any]) -> None:
 
 
 def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
+    started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     config_path = config_path.absolute()
     config = load_config(config_path)
     root = resolve_workspace(config_path, config)
@@ -82,10 +84,13 @@ def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
         int(config["max_artifact_bytes"]),
         excluded_paths={output_relative},
     )
+    artifact_digests = {item.path: item.sha256 for item in artifacts}
+    junit_paths = [Path(item).as_posix() for item in config["junit"]]
     checks, junit_warnings = collect_junit_checks(
         root,
-        list(config["junit"]),
+        junit_paths,
         int(config["max_artifact_bytes"]),
+        artifact_digests,
     )
     warnings.extend(junit_warnings)
 
@@ -93,7 +98,7 @@ def build_manifest(config_path: Path) -> tuple[dict[str, Any], Path]:
         "schema_version": "1.0",
         "run": {
             "id": str(uuid.uuid4()),
-            "started_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "started_at": started_at,
             "source_revision": _git_revision(root),
         },
         "environment": {
