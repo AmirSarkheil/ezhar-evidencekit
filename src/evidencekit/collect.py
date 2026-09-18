@@ -84,7 +84,7 @@ def _write_manifest_posix(root: Path, relative: Path, payload: bytes) -> None:
             raise ConfigError(f"unable to write temporary manifest: {exc}") from exc
 
         try:
-            os.replace(
+            os.rename(
                 temp_name,
                 relative.parts[-1],
                 src_dir_fd=current_fd,
@@ -156,7 +156,7 @@ def _atomic_write_json(root: Path, relative: Path, manifest: dict[str, Any]) -> 
     secure_dir_fd = (
         os.open in getattr(os, "supports_dir_fd", set())
         and os.mkdir in getattr(os, "supports_dir_fd", set())
-        and os.replace in getattr(os, "supports_dir_fd", set())
+        and os.rename in getattr(os, "supports_dir_fd", set())
         and hasattr(os, "O_DIRECTORY")
         and hasattr(os, "O_NOFOLLOW")
     )
