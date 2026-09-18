@@ -29,3 +29,23 @@ def test_markdown_report_escapes_manifest_values() -> None:
     assert "<b>" not in rendered
     assert "check\\|name" in rendered
     assert "\\[click\\]\\(javascript:alert\\(1\\)\\)" in rendered
+
+
+def test_markdown_report_replaces_unpaired_surrogates() -> None:
+    manifest = {
+        "schema_version": "1.0",
+        "run": {
+            "id": "\ud800",
+            "started_at": "2026-09-18T00:00:00Z",
+            "source_revision": None,
+        },
+        "environment": {"os": "linux", "runtime": "python-3.12"},
+        "checks": [],
+        "artifacts": [],
+        "warnings": [],
+        "manifest_sha256": "0" * 64,
+    }
+
+    rendered = render_markdown(manifest)
+    rendered.encode("utf-8")
+    assert "ud800" in rendered
