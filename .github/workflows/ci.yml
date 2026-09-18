@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "build/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: mypy src/evidencekit
+      - run: pytest --cov=evidencekit --cov-report=term-missing
+      - run: python -m build
+      - name: Wheel smoke test
+        run: |
+          python -m venv /tmp/evidencekit-smoke
+          /tmp/evidencekit-smoke/bin/pip install dist/*.whl
+          /tmp/evidencekit-smoke/bin/evidencekit --help
