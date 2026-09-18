@@ -62,7 +62,14 @@ def main() -> int:
             [str(python), "-m", "pip", "install", "-e", f"{root}[dev]"],
             [str(python), "-m", "ruff", "check", "."],
             [str(python), "-m", "mypy", "src/evidencekit"],
-            [str(python), "-m", "pytest", "-q"],
+            [
+                str(python),
+                "-m",
+                "pytest",
+                "--cov=evidencekit",
+                "--cov-report=term-missing",
+                "--cov-fail-under=80",
+            ],
             [str(python), "-m", "build"],
         ]
         for command in commands:
