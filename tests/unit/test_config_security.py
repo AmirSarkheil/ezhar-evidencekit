@@ -4,7 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from evidencekit.config import load_config, resolve_manifest_path, resolve_workspace
+from evidencekit.config import (
+    _write_config_fallback,
+    load_config,
+    resolve_manifest_path,
+    resolve_workspace,
+    write_default_config,
+)
 from evidencekit.errors import ConfigError
 
 
@@ -88,3 +94,22 @@ def test_excessive_artifact_limit_is_rejected(tmp_path: Path) -> None:
     path = _write_config(tmp_path, "max_artifact_bytes: 999999999\n")
     with pytest.raises(ConfigError):
         load_config(path)
+
+
+def test_fallback_config_writer_creates_and_replaces(tmp_path: Path) -> None:
+    target_dir = tmp_path / ".evidencekit"
+    target_dir.mkdir()
+    target = target_dir / "config.yml"
+
+    _write_config_fallback(target_dir, target, b"first\n", force=False)
+    assert target.read_bytes() == b"first\n"
+
+    _write_config_fallback(target_dir, target, b"second\n", force=True)
+    assert target.read_bytes() == b"second\n"
+
+
+def test_write_default_config_refuses_existing_file(tmp_path: Path) -> None:
+    first = write_default_config(tmp_path)
+    assert first.exists()
+    with pytest.raises(ConfigError, match="already exists"):
+        write_default_config(tmp_path)
