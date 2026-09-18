@@ -7,7 +7,7 @@ from defusedxml import ElementTree as DefusedET  # type: ignore[import-untyped]
 from defusedxml.common import DefusedXmlException  # type: ignore[import-untyped]
 
 from evidencekit.errors import SecurityError
-from evidencekit.integrity import safe_artifact_path
+from evidencekit.integrity import read_artifact_bytes
 from evidencekit.models import CheckRecord
 
 
@@ -82,40 +82,39 @@ def collect_junit_checks(
     root: Path,
     paths: list[str],
     max_artifact_bytes: int,
+    artifact_digests: dict[str, str],
 ) -> tuple[list[CheckRecord], list[str]]:
     checks: list[CheckRecord] = []
     warnings: list[str] = []
 
     for relative in paths:
+        expected_digest = artifact_digests.get(relative)
+        if expected_digest is None:
+            message = "JUnit evidence is not present in the artifact manifest"
+            checks.append(_unknown(relative, message))
+            warnings.append(f"{message}: {relative}")
+            continue
+
         try:
-            candidate = safe_artifact_path(root, relative, require_exists=False)
-            if not candidate.exists():
-                checks.append(_unknown(relative, "JUnit file not found"))
-                continue
-            path = safe_artifact_path(root, relative)
-            if not path.is_file():
-                message = "JUnit path is not a regular file"
-                checks.append(_unknown(relative, message))
-                warnings.append(f"{message}: {relative}")
-                continue
-            size = path.stat().st_size
-            if size > max_artifact_bytes:
-                message = (
-                    f"JUnit file exceeds max_artifact_bytes "
-                    f"({size} > {max_artifact_bytes} bytes)"
-                )
-                checks.append(_unknown(relative, message))
-                warnings.append(f"{message}: {relative}")
-                continue
+            _path, payload, observed_digest = read_artifact_bytes(
+                root,
+                relative,
+                max_bytes=max_artifact_bytes,
+            )
         except (OSError, SecurityError) as exc:
             checks.append(_unknown(relative, str(exc)))
             warnings.append(str(exc))
             continue
 
+        if observed_digest != expected_digest:
+            message = "JUnit artifact changed after evidence hashing"
+            checks.append(_unknown(relative, message))
+            warnings.append(f"{message}: {relative}")
+            continue
+
         try:
-            tree = DefusedET.parse(path)
-            root_node = tree.getroot()
-        except (OSError, ET.ParseError, DefusedXmlException) as exc:
+            root_node = DefusedET.fromstring(payload)
+        except (ET.ParseError, DefusedXmlException, ValueError) as exc:
             message = f"unable to parse JUnit XML: {exc}"
             checks.append(_unknown(relative, message))
             warnings.append(f"{message}: {relative}")
