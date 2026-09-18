@@ -4,6 +4,7 @@ import hashlib
 import mimetypes
 import os
 import stat
+from contextlib import suppress
 from pathlib import Path
 
 from evidencekit.errors import SecurityError
@@ -78,10 +79,8 @@ def _open_regular_artifact(root: Path, relative_path: str) -> tuple[int, Path]:
             raise SecurityError(f"unable to open artifact safely: {relative_path}") from exc
         finally:
             for directory_fd in reversed(directory_fds):
-                try:
+                with suppress(OSError):
                     os.close(directory_fd)
-                except OSError:
-                    pass
     else:
         candidate = safe_artifact_path(root_resolved, relative_path)
         flags = _base_open_flags()
