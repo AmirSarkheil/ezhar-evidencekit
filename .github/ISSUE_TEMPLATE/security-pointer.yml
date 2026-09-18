@@ -1,0 +1,16 @@
+name: Security report pointer
+description: Do not disclose vulnerabilities publicly
+title: "[security] use private reporting instead"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not submit vulnerability details in a public issue.**
+        Use GitHub Private Vulnerability Reporting when available, or follow SECURITY.md.
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I will use the private reporting channel and will not post exploit details here.
+          required: true

@@ -1,0 +1,6 @@
+# Release-sensitive and contract-sensitive surfaces
+/schemas/ @AmirSarkheil
+/src/evidencekit/schema.py @AmirSarkheil
+/.github/workflows/ @AmirSarkheil
+/action/ @AmirSarkheil
+/SECURITY.md @AmirSarkheil
