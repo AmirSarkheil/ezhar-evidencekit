@@ -17,21 +17,27 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
         f"{'/'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}"
         for error in sorted(validator.iter_errors(manifest), key=lambda item: list(item.absolute_path))
     ]
+
     expected = manifest.get("manifest_sha256")
     if isinstance(expected, str):
-        actual = manifest_digest(manifest)
-        if expected != actual:
-            errors.append("manifest_sha256: digest mismatch")
+        try:
+            actual = manifest_digest(manifest)
+        except (TypeError, ValueError, UnicodeError) as exc:
+            errors.append(f"manifest_sha256: unable to canonicalize manifest: {exc}")
+        else:
+            if expected != actual:
+                errors.append("manifest_sha256: digest mismatch")
     return errors
 
 
 def load_and_validate(path: Path) -> dict[str, Any]:
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, UnicodeError) as exc:
         raise ValidationFailure(f"unable to read manifest: {exc}") from exc
     if not isinstance(manifest, dict):
         raise ValidationFailure("manifest root must be a JSON object")
+
     errors = validate_manifest_data(manifest)
     if errors:
         raise ValidationFailure("; ".join(errors))
