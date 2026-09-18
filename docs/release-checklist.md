@@ -1,10 +1,14 @@
 # Release checklist
 
-This document records the engineering and publication gate for EZHAR EvidenceKit v0.1.0.
+This document records the completed engineering and publication gate for EZHAR EvidenceKit v0.1.0.
 
-## Reviewed baseline
+## Published release
 
-The private engineering baseline was verified before publication. The public-release commit is the merge commit that introduces the v0.1.0 publication marker and final release-facing documentation.
+- **Release:** v0.1.0
+- **Release date:** 2026-09-18
+- **Release commit:** `c6c48c29e964f1f3357846e7a5351b15a892bfbb`
+- **Repository visibility:** Public
+- **GitHub Release:** `https://github.com/AmirSarkheil/ezhar-evidencekit/releases/tag/v0.1.0`
 
 ## Build and correctness
 
@@ -20,7 +24,7 @@ The private engineering baseline was verified before publication. The public-rel
 - [x] Windows and macOS smoke tests pass.
 - [x] Runtime schema matches the checked-in JSON Schema.
 
-Latest measured release-gate baseline: **68 tests passed** with **80.09% package coverage**.
+Measured v0.1.0 release baseline: **68 tests passed** with **80.09% package coverage**.
 
 ## Security
 
@@ -47,11 +51,15 @@ Latest measured release-gate baseline: **68 tests passed** with **80.09% package
 - [x] LICENSE and NOTICE are present.
 - [x] Governance, maintainers, contribution rules, and code of conduct are present.
 
-## Publication authorization
+## Publication
 
 - [x] Maintainer explicitly approved the v0.1.0 public launch on 2026-09-18.
-- [x] Repository automation is configured to create the annotated `v0.1.0` tag and GitHub Release from the authorized merge commit.
-- [x] Release automation rebuilds the wheel and source distribution, creates SHA-256 checksums, and generates a release EvidenceKit manifest/report before publication.
-- [ ] Repository visibility is changed to **Public** in GitHub repository administration.
+- [x] Annotated `v0.1.0` tag points to the authorized release commit.
+- [x] GitHub Release is published.
+- [x] Wheel and source distribution are attached.
+- [x] SHA-256 checksum file is attached.
+- [x] Release EvidenceKit manifest and report are attached.
+- [x] Repository visibility is Public.
+- [x] One-time publication workflow and authorization trigger were retired after successful release.
 
-The final visibility toggle is a GitHub repository-administration action and is intentionally separate from source-code verification.
+Passing this checklist records observed engineering and release controls; it is not a certification or compliance attestation.
