@@ -9,6 +9,10 @@ inputs:
     description: "Python version used to run EvidenceKit"
     required: false
     default: "3.12"
+  artifact-name:
+    description: "Name of the uploaded GitHub Actions artifact"
+    required: false
+    default: "evidencekit-package"
 runs:
   using: "composite"
   steps:
@@ -76,7 +80,7 @@ runs:
 
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
-        name: evidencekit-package
+        name: ${{ inputs.artifact-name }}
         path: |
           .evidencekit/action-output/evidence.json
           .evidencekit/action-output/evidence-report.md
