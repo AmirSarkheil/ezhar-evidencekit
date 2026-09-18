@@ -63,7 +63,7 @@ EvidenceKit is not a certification product, formal-verification system, SBOM rep
 python -m pip install -e ".[dev]"
 ruff check .
 mypy src/evidencekit
-pytest -q
+pytest --cov=evidencekit --cov-report=term-missing --cov-fail-under=80
 python -m build
 ~~~
 
@@ -74,9 +74,11 @@ python -m build
 - Security reports: see [SECURITY.md](SECURITY.md)
 - Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md)
 - Roadmap: see [ROADMAP.md](ROADMAP.md)
+- Release gate: see [docs/release-checklist.md](docs/release-checklist.md)
+- Adoption plan: see [docs/adoption.md](docs/adoption.md)
 
 ## IP boundary
 
-This repository is intentionally standalone. No private EZHAR DYNAMICS product repository is imported or required at runtime. Examples and fixtures are synthetic and generic.
+This repository is intentionally standalone. No private EZHAR DYNAMICS product repository is imported or required at runtime. Examples and fixtures are synthetic and generic. See [docs/ip-boundary.md](docs/ip-boundary.md) for the explicit carve-out rules.
 
 Copyright 2026 EZHAR DYNAMICS contributors.
