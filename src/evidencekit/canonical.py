@@ -14,7 +14,7 @@ def canonical_bytes(manifest: dict[str, Any]) -> bytes:
         normalized,
         sort_keys=True,
         separators=(",", ":"),
-        ensure_ascii=False,
+        ensure_ascii=True,
         allow_nan=False,
     ).encode("utf-8")
 
