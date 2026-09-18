@@ -50,9 +50,20 @@ runs:
         evidencekit validate "$MANIFEST"
         evidencekit verify "$MANIFEST" --workspace "$WORKSPACE"
 
-        mkdir -p .evidencekit/action-output
-        evidencekit report "$MANIFEST"           --format markdown           --output .evidencekit/action-output/evidence-report.md
-        cp -- "$MANIFEST" .evidencekit/action-output/evidence.json
+        OUTPUT_DIR=".evidencekit/action-output"
+        OUTPUT_MANIFEST="$OUTPUT_DIR/evidence.json"
+        OUTPUT_REPORT="$OUTPUT_DIR/evidence-report.md"
+        mkdir -p "$OUTPUT_DIR"
+
+        evidencekit report "$MANIFEST" \
+          --format markdown \
+          --output "$OUTPUT_REPORT"
+
+        MANIFEST_REAL="$(python -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$MANIFEST")"
+        OUTPUT_REAL="$(python -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$OUTPUT_MANIFEST")"
+        if [[ "$MANIFEST_REAL" != "$OUTPUT_REAL" ]]; then
+          cp -- "$MANIFEST" "$OUTPUT_MANIFEST"
+        fi
 
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
