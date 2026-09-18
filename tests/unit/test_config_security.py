@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -113,3 +114,64 @@ def test_write_default_config_refuses_existing_file(tmp_path: Path) -> None:
     assert first.exists()
     with pytest.raises(ConfigError, match="already exists"):
         write_default_config(tmp_path)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO creation unavailable")
+def test_config_fifo_is_rejected_without_blocking(tmp_path: Path) -> None:
+    config_dir = tmp_path / ".evidencekit"
+    config_dir.mkdir()
+    path = config_dir / "config.yml"
+    os.mkfifo(path)
+    with pytest.raises(ConfigError, match="regular file"):
+        load_config(path)
+
+
+def test_force_init_rejects_hard_linked_config(tmp_path: Path) -> None:
+    config = write_default_config(tmp_path)
+    external = tmp_path / "external-config-link.yml"
+    try:
+        os.link(config, external)
+    except OSError:
+        pytest.skip("hard links unavailable")
+
+    original = external.read_bytes()
+    with pytest.raises(ConfigError, match="hard-linked"):
+        write_default_config(tmp_path, force=True)
+    assert external.read_bytes() == original
+
+
+def test_workspace_cannot_be_git_metadata(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, 'workspace: ".git"\n')
+    config = load_config(path)
+    with pytest.raises(ConfigError, match="protected"):
+        resolve_workspace(path, config)
+
+
+def test_workspace_symlink_loop_becomes_config_error(tmp_path: Path) -> None:
+    loop = tmp_path / "loop"
+    try:
+        loop.symlink_to(loop, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    path = _write_config(tmp_path, 'workspace: "loop"\n')
+    config = load_config(path)
+    with pytest.raises(ConfigError):
+        resolve_workspace(path, config)
+
+
+def test_symlinked_config_base_is_rejected(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    config_dir = real / ".evidencekit"
+    config_dir.mkdir()
+    (config_dir / "config.yml").write_text("workspace: .\n", encoding="utf-8")
+
+    alias = tmp_path / "alias"
+    try:
+        alias.symlink_to(real, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    with pytest.raises(ConfigError, match="symlinks"):
+        load_config(alias / ".evidencekit" / "config.yml")
