@@ -51,6 +51,12 @@ def _check_json_depth(text: str) -> None:
 
 
 def _read_manifest_text(path: Path) -> str:
+    try:
+        if path.is_symlink():
+            raise ValidationFailure("manifest must not be a symlink")
+    except OSError as exc:
+        raise ValidationFailure(f"unable to inspect manifest path: {exc}") from exc
+
     flags = os.O_RDONLY
     if hasattr(os, "O_BINARY"):
         flags |= os.O_BINARY
