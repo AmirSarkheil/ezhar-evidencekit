@@ -2,7 +2,13 @@
 
 The bundled composite action runs EvidenceKit in the calling repository, validates and verifies the configured manifest, then uploads a normalized copy of the manifest and its Markdown report as a workflow artifact.
 
-The action supports a custom `manifest` path in `.evidencekit/config.yml`; the uploaded artifact still uses stable names under `.evidencekit/action-output/`.
+The action supports a custom `manifest` path in `.evidencekit/config.yml`; the uploaded copies still use stable file names under `.evidencekit/action-output/`.
+
+## Inputs
+
+- `config`: EvidenceKit configuration path. Default: `.evidencekit/config.yml`.
+- `python-version`: Python version used by the action. Default: `3.12`.
+- `artifact-name`: GitHub Actions artifact name. Default: `evidencekit-package`. Set a distinct value when the same workflow invokes EvidenceKit more than once.
 
 Example inside this repository:
 
@@ -12,6 +18,7 @@ steps:
   - uses: ./action
     with:
       config: .evidencekit/config.yml
+      artifact-name: evidencekit-package
 ```
 
 For external repositories, pin EvidenceKit to the **full commit SHA** of a reviewed release commit:
