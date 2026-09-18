@@ -10,7 +10,8 @@ from typing import Any
 
 import yaml
 
-from evidencekit.errors import ConfigError
+from evidencekit.errors import ConfigError, SecurityError
+from evidencekit.integrity import open_directory_no_symlinks
 
 
 HARD_MAX_ARTIFACT_BYTES = 268_435_456
@@ -171,10 +172,9 @@ def _inspect_existing_config(directory_fd: int) -> None:
 
 
 def _write_config_posix(target_dir: Path, payload: bytes, *, force: bool) -> None:
-    directory_flags = _open_flags() | os.O_DIRECTORY | os.O_NOFOLLOW
     try:
-        directory_fd = os.open(target_dir, directory_flags)
-    except OSError as exc:
+        directory_fd = open_directory_no_symlinks(target_dir)
+    except SecurityError as exc:
         raise ConfigError(f"unable to open configuration directory safely: {exc}") from exc
 
     temp_name = f".config-{uuid.uuid4().hex}.tmp"
