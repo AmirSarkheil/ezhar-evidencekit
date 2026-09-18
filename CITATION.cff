@@ -6,5 +6,7 @@ authors:
   - family-names: "Sarkheil"
     given-names: "Amir Mohammad"
 version: 0.1.0
+date-released: 2026-09-18
 license: Apache-2.0
 repository-code: "https://github.com/AmirSarkheil/ezhar-evidencekit"
+url: "https://github.com/AmirSarkheil/ezhar-evidencekit"
