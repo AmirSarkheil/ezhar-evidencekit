@@ -1,7 +1,19 @@
 from __future__ import annotations
 
+import html
 import json
 from typing import Any
+
+
+_MARKDOWN_SPECIAL = "\\*_{}[]()#+!|" + chr(96)
+
+
+def _markdown_text(value: Any) -> str:
+    text = html.escape(str(value), quote=False)
+    text = text.replace("\r", " ").replace("\n", " ")
+    for char in _MARKDOWN_SPECIAL:
+        text = text.replace(char, f"\\{char}")
+    return text
 
 
 def render_markdown(manifest: dict[str, Any]) -> str:
@@ -10,16 +22,20 @@ def render_markdown(manifest: dict[str, Any]) -> str:
     lines = [
         "# EvidenceKit Report",
         "",
-        f"- **Schema:** {manifest['schema_version']}",
-        f"- **Run ID:** {run['id']}",
-        f"- **Started:** {run['started_at']}",
-        f"- **Source revision:** {run.get('source_revision') or 'not captured'}",
-        f"- **Environment:** {env['os']} / {env['runtime']}",
-        f"- **Manifest SHA-256:** {manifest['manifest_sha256']}",
+        f"- **Schema:** {_markdown_text(manifest['schema_version'])}",
+        f"- **Run ID:** {_markdown_text(run['id'])}",
+        f"- **Started:** {_markdown_text(run['started_at'])}",
+        f"- **Source revision:** {_markdown_text(run.get('source_revision') or 'not captured')}",
+        (
+            f"- **Environment:** {_markdown_text(env['os'])} / "
+            f"{_markdown_text(env['runtime'])}"
+        ),
+        f"- **Manifest SHA-256:** {_markdown_text(manifest['manifest_sha256'])}",
         "",
         "## Checks",
         "",
     ]
+
     checks = manifest.get("checks", [])
     if not checks:
         lines.append("_No checks recorded._")
@@ -27,7 +43,10 @@ def render_markdown(manifest: dict[str, Any]) -> str:
         lines.extend(["| Check | Status | Evidence |", "|---|---|---|"])
         for check in checks:
             lines.append(
-                f"| {check['name']} | {check['status']} | {check.get('evidence_ref', '')} |"
+                "| "
+                f"{_markdown_text(check['name'])} | "
+                f"{_markdown_text(check['status'])} | "
+                f"{_markdown_text(check.get('evidence_ref', ''))} |"
             )
 
     lines.extend(["", "## Artifacts", ""])
@@ -38,24 +57,29 @@ def render_markdown(manifest: dict[str, Any]) -> str:
         lines.extend(["| Path | Bytes | SHA-256 |", "|---|---:|---|"])
         for artifact in artifacts:
             lines.append(
-                f"| {artifact['path']} | {artifact['size']} | {artifact['sha256']} |"
+                "| "
+                f"{_markdown_text(artifact['path'])} | "
+                f"{_markdown_text(artifact['size'])} | "
+                f"{_markdown_text(artifact['sha256'])} |"
             )
 
     warnings = manifest.get("warnings", [])
     if warnings:
         lines.extend(["", "## Warnings", ""])
-        lines.extend(f"- {warning}" for warning in warnings)
+        lines.extend(f"- {_markdown_text(warning)}" for warning in warnings)
 
-    lines.extend([
-        "",
-        "## Scope",
-        "",
-        "This report describes captured engineering evidence and integrity metadata. "
-        "It is not a certification, compliance attestation, or proof of real-world outcome.",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Scope",
+            "",
+            "This report describes captured engineering evidence and integrity metadata. "
+            "It is not a certification, compliance attestation, or proof of real-world outcome.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
 def render_json(manifest: dict[str, Any]) -> str:
-    return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    return json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
