@@ -217,7 +217,7 @@ def safe_artifact_path(root: Path, relative_path: str, *, require_exists: bool =
         if candidate.is_symlink():
             raise SecurityError(f"symlink artifacts are not allowed: {relative_path}")
         resolved = candidate.resolve(strict=False)
-    except (OSError, ValueError) as exc:
+    except (OSError, UnicodeError, ValueError) as exc:
         raise SecurityError(f"unable to resolve artifact path: {relative_path}") from exc
 
     try:
