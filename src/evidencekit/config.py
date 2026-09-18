@@ -123,10 +123,23 @@ def _read_config_text(path: Path) -> str:
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
 
+    parent_fd: int | None = None
     try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
+        if (
+            os.open in getattr(os, "supports_dir_fd", set())
+            and hasattr(os, "O_DIRECTORY")
+            and hasattr(os, "O_NOFOLLOW")
+        ):
+            parent_fd = open_directory_no_symlinks(path.parent)
+            descriptor = os.open(path.name, flags, dir_fd=parent_fd)
+        else:
+            descriptor = os.open(path, flags)
+    except (OSError, SecurityError) as exc:
         raise ConfigError(f"unable to open configuration safely: {exc}") from exc
+    finally:
+        if parent_fd is not None:
+            with suppress(OSError):
+                os.close(parent_fd)
 
     try:
         with os.fdopen(descriptor, "rb") as handle:
