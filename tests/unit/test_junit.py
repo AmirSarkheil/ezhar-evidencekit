@@ -117,3 +117,41 @@ def test_junit_digest_change_is_reported_unknown(tmp_path: Path) -> None:
     assert checks[0].status == "unknown"
     assert "changed after evidence hashing" in (checks[0].summary or "")
     assert warnings
+
+
+def test_junit_element_limit_is_enforced(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("evidencekit.collectors.junit.MAX_JUNIT_ELEMENTS", 3)
+    report = tmp_path / "report.xml"
+    relative = "report.xml"
+    report.write_text(
+        "<testsuite><testcase name='a'/><testcase name='b'/><testcase name='c'/></testsuite>",
+        encoding="utf-8",
+    )
+    checks, warnings = collect_junit_checks(
+        tmp_path,
+        [relative],
+        1_000_000,
+        _digest_map(report, relative),
+    )
+    assert checks[0].status == "unknown"
+    assert "element limit" in (checks[0].summary or "")
+    assert warnings
+
+
+def test_junit_depth_limit_is_enforced(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("evidencekit.collectors.junit.MAX_JUNIT_DEPTH", 2)
+    report = tmp_path / "report.xml"
+    relative = "report.xml"
+    report.write_text(
+        "<testsuites><testsuite><testcase name='a'/></testsuite></testsuites>",
+        encoding="utf-8",
+    )
+    checks, warnings = collect_junit_checks(
+        tmp_path,
+        [relative],
+        1_000_000,
+        _digest_map(report, relative),
+    )
+    assert checks[0].status == "unknown"
+    assert "depth limit" in (checks[0].summary or "")
+    assert warnings
