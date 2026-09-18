@@ -25,7 +25,7 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy src/evidencekit
-      - run: pytest --cov=evidencekit --cov-report=term-missing
+      - run: pytest --cov=evidencekit --cov-report=term-missing --cov-fail-under=80
       - run: python -m build
       - name: Wheel smoke test
         run: |
