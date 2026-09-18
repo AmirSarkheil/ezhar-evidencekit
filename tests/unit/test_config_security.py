@@ -175,3 +175,71 @@ def test_symlinked_config_base_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="symlinks"):
         load_config(alias / ".evidencekit" / "config.yml")
+
+
+def test_empty_config_uses_defaults(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, "")
+    config = load_config(path)
+    assert config["schema_version"] == "1.0"
+    assert config["manifest"] == "evidence.json"
+
+
+def test_non_mapping_config_is_rejected(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, "- item\n")
+    with pytest.raises(ConfigError, match="mapping"):
+        load_config(path)
+
+
+def test_unsupported_schema_version_is_rejected(tmp_path: Path) -> None:
+    path = _write_config(tmp_path, 'schema_version: "2.0"\n')
+    with pytest.raises(ConfigError, match="schema_version"):
+        load_config(path)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'include: "artifacts/*"\n',
+        'exclude: ["../private/*"]\n',
+        'junit: "artifacts/pytest.xml"\n',
+        "max_artifact_bytes: 0\n",
+    ],
+)
+def test_invalid_config_field_shapes_are_rejected(tmp_path: Path, text: str) -> None:
+    path = _write_config(tmp_path, text)
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+def test_oversized_config_is_rejected(tmp_path: Path) -> None:
+    from evidencekit.config import MAX_CONFIG_BYTES
+
+    config_dir = tmp_path / ".evidencekit"
+    config_dir.mkdir()
+    path = config_dir / "config.yml"
+    path.write_bytes(b"#" * (MAX_CONFIG_BYTES + 1))
+    with pytest.raises(ConfigError, match="maximum size"):
+        load_config(path)
+
+
+def test_force_init_atomically_replaces_regular_config(tmp_path: Path) -> None:
+    path = write_default_config(tmp_path)
+    path.write_text("schema_version: broken\n", encoding="utf-8")
+    replaced = write_default_config(tmp_path, force=True)
+    assert replaced == path
+    assert load_config(path)["schema_version"] == "1.0"
+
+
+def test_config_file_symlink_is_rejected(tmp_path: Path) -> None:
+    real = tmp_path / "real.yml"
+    real.write_text("workspace: .\n", encoding="utf-8")
+    config_dir = tmp_path / ".evidencekit"
+    config_dir.mkdir()
+    link = config_dir / "config.yml"
+    try:
+        link.symlink_to(real)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    with pytest.raises(ConfigError):
+        load_config(link)
