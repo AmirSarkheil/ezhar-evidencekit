@@ -6,7 +6,7 @@ A repository can run the evidence loop after tests/builds produce artifacts:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, pinned
   - name: Run tests
     run: pytest --junitxml=artifacts/pytest.xml
   - uses: ./action
@@ -14,6 +14,8 @@ steps:
       config: .evidencekit/config.yml
 ```
 
-The action creates `evidence.json`, validates it, verifies referenced artifacts, creates `evidence-report.md`, and uploads both files as a workflow artifact.
+The action collects the configured manifest, validates it, verifies referenced artifacts against the configured workspace, creates a Markdown report, and uploads normalized copies of the manifest and report as a workflow artifact.
 
-For external consumers, use a released immutable tag after EvidenceKit becomes public.
+Custom manifest locations such as `reports/evidence.json` are supported. The upload names remain stable under `.evidencekit/action-output/`.
+
+For external consumers, pin the EvidenceKit action itself to a reviewed **full commit SHA** after the repository becomes public. A release tag is useful as human-readable metadata but is not an immutable execution reference.
