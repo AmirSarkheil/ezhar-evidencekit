@@ -196,7 +196,7 @@ def _write_config_posix(target_dir: Path, payload: bytes, *, force: bool) -> Non
         if force:
             _inspect_existing_config(directory_fd)
             try:
-                os.replace(
+                os.rename(
                     temp_name,
                     "config.yml",
                     src_dir_fd=directory_fd,
@@ -321,7 +321,7 @@ def write_default_config(repo_root: Path, *, force: bool = False) -> Path:
     secure_dir_fd = (
         os.open in getattr(os, "supports_dir_fd", set())
         and os.link in getattr(os, "supports_dir_fd", set())
-        and os.replace in getattr(os, "supports_dir_fd", set())
+        and os.rename in getattr(os, "supports_dir_fd", set())
         and hasattr(os, "O_DIRECTORY")
         and hasattr(os, "O_NOFOLLOW")
     )
