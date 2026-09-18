@@ -379,8 +379,11 @@ def resolve_workspace(config_path: Path, config: dict[str, Any]) -> Path:
     if any(part.lower() in _PROTECTED_OUTPUT_PARTS for part in workspace.parts):
         raise ConfigError("workspace must not be inside protected repository metadata")
 
+    lexical_candidate = base / workspace
     try:
-        candidate = (base / workspace).resolve(strict=False)
+        if lexical_candidate.is_symlink():
+            lexical_candidate.resolve(strict=True)
+        candidate = lexical_candidate.resolve(strict=False)
         relative = candidate.relative_to(base)
     except (OSError, RuntimeError, ValueError) as exc:
         raise ConfigError(f"unable to resolve workspace safely: {exc}") from exc
