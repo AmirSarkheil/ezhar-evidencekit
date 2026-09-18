@@ -13,7 +13,10 @@ from evidencekit.verify import verify_manifest
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="evidencekit", description="Reproducible evidence packages")
+    parser = argparse.ArgumentParser(
+        prog="evidencekit",
+        description="Reproducible evidence packages",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     init = sub.add_parser("init", help="create .evidencekit/config.yml")
@@ -27,7 +30,9 @@ def _parser() -> argparse.ArgumentParser:
 
     verify = sub.add_parser("verify", help="verify manifest and artifact integrity")
     verify.add_argument("manifest")
-    verify.add_argument("--workspace")
+    verify_root = verify.add_mutually_exclusive_group()
+    verify_root.add_argument("--workspace")
+    verify_root.add_argument("--config")
 
     report = sub.add_parser("report", help="render a report")
     report.add_argument("manifest")
@@ -42,18 +47,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "init":
             print(write_default_config(Path.cwd(), force=args.force))
             return 0
+
         if args.command == "collect":
             manifest, path = build_manifest(Path(args.config))
             print(f"wrote {path} ({len(manifest['artifacts'])} artifacts)")
             return 0
+
         if args.command == "validate":
             load_and_validate(Path(args.manifest))
             print("valid")
             return 0
+
         if args.command == "verify":
             _, problems = verify_manifest(
                 Path(args.manifest),
-                Path(args.workspace) if args.workspace else None,
+                workspace=Path(args.workspace) if args.workspace else None,
+                config_path=Path(args.config) if args.config else None,
             )
             if problems:
                 for problem in problems:
@@ -61,16 +70,22 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             print("verified")
             return 0
+
         if args.command == "report":
             manifest = load_and_validate(Path(args.manifest))
-            rendered = render_markdown(manifest) if args.format == "markdown" else render_json(manifest)
+            rendered = (
+                render_markdown(manifest)
+                if args.format == "markdown"
+                else render_json(manifest)
+            )
             if args.output:
                 Path(args.output).write_text(rendered, encoding="utf-8")
                 print(args.output)
             else:
                 print(rendered, end="")
             return 0
-    except EvidenceKitError as exc:
+
+    except (EvidenceKitError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     return 1
