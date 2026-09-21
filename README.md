@@ -18,7 +18,7 @@ It turns files produced by tests and builds into a versioned, machine-readable E
 
 **What ran, against which source revision and environment, and which exact artifacts can be independently checked later?**
 
-EvidenceKit does not implement proprietary policy engines, scoring logic, or private product workflows. It records verifiable engineering facts.
+EvidenceKit is intentionally standalone and does not include private EZHAR product implementations or confidential R&D assets. It records verifiable engineering facts.
 
 ## Install
 
@@ -121,11 +121,11 @@ python -m build
 - Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md)
 - Roadmap: see [ROADMAP.md](ROADMAP.md)
 - Release verification: see [docs/release-checklist.md](docs/release-checklist.md)
-- Adoption plan: see [docs/adoption.md](docs/adoption.md)
+- Community and adoption principles: see [docs/adoption.md](docs/adoption.md)
 - v0.1.0 release notes: see [docs/release-notes-v0.1.0.md](docs/release-notes-v0.1.0.md)
 
 ## IP boundary
 
-This repository is intentionally standalone. No private EZHAR DYNAMICS product repository is imported or required at runtime. Examples and fixtures are synthetic and generic. See [docs/ip-boundary.md](docs/ip-boundary.md) for the explicit carve-out rules.
+This repository is intentionally standalone. See [docs/ip-boundary.md](docs/ip-boundary.md) for the public/private boundary used for contributions and release review.
 
-Copyright 2026 EZHAR DYNAMICS contributors.
+Copyright 2026 Amir Mohammad Sarkheil and EZHAR EvidenceKit contributors.
