@@ -13,7 +13,7 @@ Describe the problem and the smallest change that solves it.
 
 - [ ] Schema compatibility considered
 - [ ] Security impact considered
-- [ ] No secrets, private customer data, internal codenames, or private-repository code added
+- [ ] No private-repository material, confidential R&D, non-public data, or credentials added
 - [ ] Any new dependency has a clear reason
 
 ## Notes

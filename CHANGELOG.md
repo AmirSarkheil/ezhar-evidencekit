@@ -6,7 +6,7 @@ All notable user-visible changes to EvidenceKit are documented here.
 
 ### Documentation
 - Simplified the public roadmap and community-adoption guidance to avoid publishing unnecessary internal planning detail.
-- Generalized the public/private IP-boundary language.
+- Generalized the public/private IP-boundary language and public contribution/release wording.
 - Clarified the copyright notice to identify the current author and project contributors without implying a separate legal entity ownership record.
 
 ## [0.1.0] - 2026-09-18

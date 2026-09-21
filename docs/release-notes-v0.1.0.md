@@ -97,4 +97,4 @@ The release evidence package is produced by EvidenceKit itself against the built
 
 EvidenceKit does not provide certification, compliance attestation, formal verification, SBOM replacement, complete secret detection, or proof of real-world outcomes.
 
-The open-source repository is intentionally separated from private EZHAR DYNAMICS product implementation and proprietary policy/scoring logic. See `docs/ip-boundary.md`.
+The open-source repository is intentionally separated from private EZHAR product implementations and confidential R&D assets. See `docs/ip-boundary.md`.
