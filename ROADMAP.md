@@ -1,26 +1,17 @@
 # Roadmap
 
-Roadmap items are plans, not implemented claims.
+EvidenceKit's public roadmap is intentionally high-level.
 
-## v0.1.0 — Core evidence loop
-- Versioned Evidence Manifest v1.
-- collect -> validate -> verify -> report workflow.
-- Artifact hashing and tamper detection.
-- JUnit check ingestion.
-- Python 3.11-3.13 CI.
-- Security/dependency checks.
-- GitHub Action MVP.
-- Minimal examples and documentation.
+The project prioritizes improvements that strengthen:
 
-## v0.2.x — Maintainer ergonomics
-- `doctor` environment diagnostics.
-- More polished GitHub Action inputs/outputs.
-- Additional CI adapters and examples.
-- Better validation diagnostics.
+- reliability and reproducibility;
+- validation and diagnostics;
+- compatibility with common engineering workflows;
+- security and maintainability;
+- documentation and contributor usability.
 
-## v0.3.x — Evidence comparison
-- `diff` between two manifests.
-- Explicit evidence deltas.
-- Optional signature/provenance extensions after a separate design review.
+Specific future features, sequencing, and release timing are not commitments until they are implemented and documented in a release or accepted public issue.
 
-The project will not add provider-specific complexity to the core unless a real integration need justifies it.
+Provider-specific complexity will not be added to the core unless a demonstrated interoperability need justifies it.
+
+For shipped behavior, use the release notes and changelog as the authoritative record.

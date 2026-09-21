@@ -1,33 +1,16 @@
-# Adoption plan
+# Community and adoption principles
 
-EvidenceKit should earn adoption through utility and reproducibility rather than promotional claims.
+EvidenceKit should earn adoption through useful behavior, reproducibility, and independent use rather than promotional claims or manufactured activity.
 
-## Phase 1 — Private dogfooding
+## Principles
 
-Use the tool on its own repository and at least one independent synthetic example. Preserve generated CI artifacts and failure cases as engineering evidence.
+- keep the core vendor-neutral;
+- make the first-use path short and reproducible;
+- document limitations as clearly as capabilities;
+- prefer real maintainer feedback over vanity metrics;
+- treat independent integrations, reproducible issues, and reviewable contributions as stronger signals than raw attention;
+- avoid incentives or practices that create artificial stars, forks, issues, or usage claims.
 
-## Phase 2 — Public maintainer usability
+Public examples and integrations should demonstrate shipped behavior only.
 
-After the release gate is satisfied:
-
-- publish a five-minute quickstart;
-- provide a minimal repository example and a pytest/JUnit example;
-- document GitHub Actions integration with immutable pins;
-- make issue templates and contribution rules easy to follow;
-- answer early maintainer questions with reproducible examples.
-
-## Phase 3 — Independent integrations
-
-Prioritize integrations only when a real maintainer need exists. Candidate formats include additional test reports and CI metadata, but the core manifest should remain vendor-neutral.
-
-## Signals to track
-
-Useful adoption signals include:
-
-- independent repositories producing valid manifests;
-- repeat users across multiple releases;
-- external issues or pull requests with reproducible cases;
-- references to the schema or action by maintainers;
-- successful verification of evidence generated on a different machine or runner.
-
-Stars, impressions, and announcement reach may be observed, but they are not substitutes for independent use.
+Detailed growth planning, partnership strategy, and internal success criteria are outside the scope of this public repository.
