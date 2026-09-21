@@ -23,7 +23,7 @@ A change is expected to include tests for new behavior, documentation when user-
 - CI must pass.
 - Schema-impacting changes require explicit compatibility review.
 - Security-sensitive changes require threat-model review.
-- Do not copy code, datasets, prompts, internal codenames, endpoints, credentials, or implementation details from private EZHAR repositories.
+- Do not add material from private repositories, confidential R&D, non-public data, credentials, or other content that is not cleared for public release.
 - Contributions are submitted under Apache-2.0 unless explicitly stated otherwise.
 
 By participating, contributors agree to follow the Code of Conduct.
