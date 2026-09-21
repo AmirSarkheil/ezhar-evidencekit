@@ -4,29 +4,31 @@ EvidenceKit is intentionally designed as a standalone public utility.
 
 ## In scope
 
-The open repository may contain:
+This repository may contain:
 
-- a vendor-neutral evidence manifest contract;
-- generic collectors for public CI/test formats;
+- the public Evidence Manifest contract;
+- generic interoperability with public engineering formats;
 - integrity and reproducibility primitives;
 - documentation, examples, tests, and integration glue;
 - public governance and security processes.
 
 ## Out of scope
 
-The repository must not contain or reconstruct:
+This repository must not contain or reconstruct:
 
-- private AEGIS or AGR implementation code;
-- proprietary policy engines, scoring logic, decision thresholds, or internal prompts;
-- customer or partner data;
+- private EZHAR product implementations;
+- proprietary decision, governance, or evaluation logic;
+- confidential research and development assets;
+- customer, partner, or other non-public data;
 - private endpoints, credentials, tokens, or deployment secrets;
-- internal codenames that reveal non-public architecture;
-- code copied from private EZHAR repositories without an explicit release review.
+- code or documentation copied from private repositories without explicit release review.
 
 ## Review rule
 
-A contribution that crosses the boundary is blocked even if it is technically useful. If a public feature needs concepts from a private system, contributors should define the smallest generic interface required by the open-source use case and implement it independently.
+A contribution that crosses this boundary is blocked even if it is technically useful.
+
+When a public feature needs a concept that also exists in private work, the public implementation must be independently defined around the smallest generic interface required by the open-source use case.
 
 ## Evidence rule
 
-Examples and fixtures should be synthetic or derived from clearly redistributable public material. Claims in documentation should describe only behavior demonstrated by the public repository.
+Examples and fixtures should be synthetic or derived from clearly redistributable public material. Public claims should describe only behavior demonstrated by this repository.
